@@ -97,7 +97,7 @@
   <!-- Firebase SDK en module -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, getDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCDVZO1dnKdtdhporLGKdG0UDZZeazxfRM",
@@ -111,18 +111,29 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    window.verifierMotDePasse = function () {
+    async function verifierMotDePasse() {
       const motEntre = document.getElementById('codeSecret').value;
-      const bonMotDePasse = "m.q_t@{YZ9)6";
-      if (motEntre === bonMotDePasse) {
-        document.getElementById('verrou').style.display = 'none';
-        document.getElementById('contenuSite').style.display = 'block';
-        startCamera();
-        afficherHistorique();
-      } else {
-        alert("Mot de passe incorrect !");
+      try {
+        const docRef = doc(db, "securite", "motdepasse");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const vraiMotDePasse = docSnap.data().code;
+          if (motEntre === vraiMotDePasse) {
+            document.getElementById('verrou').style.display = 'none';
+            document.getElementById('contenuSite').style.display = 'block';
+            startCamera();
+            afficherHistorique();
+          } else {
+            alert("Mot de passe incorrect ❌");
+          }
+        } else {
+          alert("Erreur : mot de passe non trouvé sur Firebase");
+        }
+      } catch (e) {
+        console.error("Erreur Firebase :", e);
+        alert("Erreur lors de la vérification du mot de passe.");
       }
-    };
+    }
 
     window.afficherFormulaire = function () {
       document.getElementById('formulaire').style.display = 'block';
