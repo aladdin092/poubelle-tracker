@@ -97,7 +97,7 @@
   <!-- Firebase SDK en module -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCDVZO1dnKdtdhporLGKdG0UDZZeazxfRM",
@@ -139,15 +139,29 @@
       const q = query(collection(db, "sorties"), orderBy("timestamp", "desc"));
       const querySnapshot = await getDocs(q);
 
-      querySnapshot.forEach(doc => {
-        const data = doc.data();
-        if (!data.prenom || !data.date || !data.photo) return;
+      const deuxMoisMs = 60 * 24 * 60 * 60 * 1000; // 60 jours
+      const maintenant = new Date().getTime();
+
+      for (const docSnap of querySnapshot.docs) {
+        const data = docSnap.data();
+        const docId = docSnap.id;
+        const dateDoc = data.timestamp?.toDate();
+
+        if (!data.prenom || !data.date || !data.photo || !dateDoc) continue;
+
+        const ageMs = maintenant - dateDoc.getTime();
+        if (ageMs > deuxMoisMs) {
+          // Supprimer les anciennes entrées
+          await deleteDoc(doc(db, "sorties", docId));
+          continue;
+        }
+
         liste.innerHTML += `
           <div class="entry">
             <strong>${data.prenom}</strong> a sorti la poubelle le <strong>${data.date}</strong><br>
             <img src="${data.photo}" alt="Poubelle">
           </div>`;
-      });
+      }
     };
 
     window.ajouterSortie = async function () {
