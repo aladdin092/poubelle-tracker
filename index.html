@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poubelle Tracker</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom right, #e0f5e9, #c8e6c9);
+      color: #333;
+    }
+    header {
+      background-color: #4caf50;
+      color: white;
+      text-align: center;
+      padding: 1rem;
+    }
+    main {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    button {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      margin: 1rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #formulaire, #historique {
+      display: none;
+      margin-top: 2rem;
+      width: 100%;
+      max-width: 500px;
+    }
+    input, label, textarea {
+      display: block;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+    img {
+      max-width: 100px;
+      margin-top: 0.5rem;
+    }
+    .entry {
+      background: #ffffffcc;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="verrou" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#c8e6c9;">
+    <h2>🔐 Accès réservé</h2>
+    <input type="password" id="codeSecret" placeholder="Mot de passe" style="padding:10px; font-size:1rem; margin:1rem;">
+    <button onclick="verifierMotDePasse()">Entrer</button>
+  </div>
+
+  <div id="contenuSite" style="display:none;">
+    <header>
+      <h1>Poubelle Tracker de Famille</h1>
+    </header>
+    <main>
+      <button onclick="afficherFormulaire()">Ajouter une nouvelle sortie</button>
+      <button onclick="afficherHistorique()">Voir l'historique</button>
+
+      <div id="formulaire">
+        <h2>Nouvelle sortie</h2>
+        <input type="text" id="prenom" placeholder="Prénom" required>
+        <input type="date" id="date" required>
+        <label>Prendre une photo (obligatoire):</label>
+        <video id="camera" autoplay playsinline width="100%"></video>
+        <button onclick="prendrePhoto()">📸 Prendre la photo</button>
+        <button onclick="changerCamera()">🔄 Changer de caméra</button>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <img id="photoPreview" src="" alt="Prévisualisation">
+        <button onclick="ajouterSortie()">Valider</button>
+      </div>
+
+      <div id="historique">
+        <h2>Historique des sorties</h2>
+        <div id="listeSorties"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Firebase SDK en module -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCDVZO1dnKdtdhporLGKdG0UDZZeazxfRM",
+      authDomain: "poubelle-tracker.firebaseapp.com",
+      projectId: "poubelle-tracker",
+      storageBucket: "poubelle-tracker.firebasestorage.app",
+      messagingSenderId: "292679327722",
+      appId: "1:292679327722:web:20c7503fbf326f96d45c93"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.verifierMotDePasse = function () {
+      const motEntre = document.getElementById('codeSecret').value;
+      const bonMotDePasse = "m.q_t@{YZ9)6";
+      if (motEntre === bonMotDePasse) {
+        document.getElementById('verrou').style.display = 'none';
+        document.getElementById('contenuSite').style.display = 'block';
+        startCamera();
+        afficherHistorique();
+      } else {
+        alert("Mot de passe incorrect !");
+      }
+    };
+
+    window.afficherFormulaire = function () {
+      document.getElementById('formulaire').style.display = 'block';
+      document.getElementById('historique').style.display = 'none';
+      startCamera();
+    };
+
+    window.afficherHistorique = async function () {
+      document.getElementById('formulaire').style.display = 'none';
+      document.getElementById('historique').style.display = 'block';
+      const liste = document.getElementById('listeSorties');
+      liste.innerHTML = '';
+
+      const q = query(collection(db, "sorties"), orderBy("timestamp", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        if (!data.prenom || !data.date || !data.photo) return;
+        liste.innerHTML += `
+          <div class="entry">
+            <strong>${data.prenom}</strong> a sorti la poubelle le <strong>${data.date}</strong><br>
+            <img src="${data.photo}" alt="Poubelle">
+          </div>`;
+      });
+    };
+
+    window.ajouterSortie = async function () {
+      const prenom = document.getElementById('prenom').value.trim();
+      const date = document.getElementById('date').value;
+      const photo = document.getElementById('photoPreview').src;
+
+      if (!prenom || !date || !photo || photo === window.location.href) {
+        alert("Tous les champs sont obligatoires.");
+        return;
+      }
+
+      try {
+        await addDoc(collection(db, "sorties"), {
+          prenom,
+          date,
+          photo,
+          timestamp: serverTimestamp()
+        });
+        alert("Sortie enregistrée en ligne ✅");
+        document.getElementById('prenom').value = '';
+        document.getElementById('date').value = '';
+        document.getElementById('photoPreview').src = '';
+        afficherHistorique();
+      } catch (e) {
+        alert("Erreur lors de l'enregistrement Firebase ❌");
+        console.error("Erreur:", e);
+      }
+    };
+
+    let cameraStream;
+    let useFrontCamera = false;
+
+    async function startCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: {
+          facingMode: useFrontCamera ? "user" : "environment"
+        }
+      };
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+        document.getElementById("camera").srcObject = cameraStream;
+      } catch (error) {
+        alert("Impossible d'accéder à la caméra.");
+      }
+    }
+
+    window.changerCamera = function () {
+      useFrontCamera = !useFrontCamera;
+      startCamera();
+    };
+
+    window.prendrePhoto = function () {
+      const video = document.getElementById("camera");
+      const canvas = document.getElementById("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+      const photoData = canvas.toDataURL("image/png");
+      document.getElementById("photoPreview").src = photoData;
+    };
+  </script>
+</body>
+</html>
